@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>猜數字氣球爆炸版</title>
+    <style>
+        :root {
+            --primary-color: #ff6b6b;
+            --bg-color: #fdfbf7;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: '微軟正黑體', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* 防止氣球變大時出現捲軸 */
+        }
+
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 { margin-top: 0; color: var(--text-color); }
+
+        /* 規則區塊 */
+        .rules-box {
+            background-color: #f0f4f8;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: left;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #555;
+        }
+        .rules-box h3 { margin-top: 0; margin-bottom: 8px; color: #2c3e50; }
+        .rules-box ul { padding-left: 20px; margin: 0; }
+
+        /* 氣球區域 */
+        .balloon-area {
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        #balloon {
+            font-size: 60px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: default;
+            user-select: none;
+            display: inline-block;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.1));
+        }
+
+        /* 爆炸動畫 */
+        @keyframes explodeAnim {
+            0% { transform: scale(3); opacity: 1; }
+            50% { transform: scale(4); opacity: 0.5; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        
+        .exploding {
+            animation: explodeAnim 0.3s forwards;
+        }
+
+        /* 遊戲控制區 */
+        .game-controls {
+            display: none; /* 初始隱藏 */
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #777;
+        }
+
+        .attempts-count {
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            font-size: 1.2rem;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        input:focus { border-color: var(--primary-color); }
+
+        .btn {
+            padding: 12px 24px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover { background-color: #ff5252; transform: translateY(-2px); }
+        .btn-primary:disabled { background-color: #ccc; transform: none; cursor: not-allowed; }
+
+        .btn-start {
+            width: 100%;
+            font-size: 1.2rem;
+            padding: 15px;
+            background-color: #2ecc71;
+            color: white;
+            margin-top: 10px;
+        }
+        .btn-start:hover { background-color: #27ae60; }
+
+        .history-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 15px;
+            max-height: 180px;
+            overflow-y: auto;
+            border-top: 1px solid #eee;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #f9f9f9;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .msg-area {
+            min-height: 24px;
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        /* 隱藏/顯示控制 */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎈 氣球危機 (1A2B)</h1>
+
+    <!-- 啟動畫面 -->
+    <div id="startScreen">
+        <div class="rules-box">
+            <h3>📖 遊戲規則：</h3>
+            <ul>
+                <li><strong>目標：</strong>猜出電腦設定的 3 個不重複數字。</li>
+                <li><strong>提示 A：</strong>數字與位置都對。</li>
+                <li><strong>提示 B：</strong>數字對但位置錯。</li>
+                <li><strong>限制：</strong>你只有 <strong>10 次機會</strong>！</li>
+                <li><strong>後果：</strong>每猜錯一次氣球會變大，第 10 次錯誤氣球會爆炸！</li>
+            </ul>
+        </div>
+        <div class="balloon-area" style="height: 60px;">
+            <div style="font-size: 40px;">🎈</div>
+        </div>
+        <button class="btn btn-start" onclick="startGame()">開始遊戲</button>
+    </div>
+
+    <!-- 遊戲畫面 -->
+    <div id="gameScreen" class="game-controls">
+        <div class="balloon-area">
+            <div id="balloon">🎈</div>
+        </div>
+
+        <div class="status-bar">
+            <span>剩餘機會: <span id="attemptsLeft" class="attempts-count">10</span></span>
+            <span>狀態: <span id="gameStatus">進行中</span></span>
+        </div>
+
+        <div class="msg-area" id="message"></div>
+
+        <div class="input-group">
+            <input type="tel" id="guessInput" maxlength="3" placeholder="輸入3個數字" autocomplete="off">
+            <button class="btn btn-primary" id="guessBtn" onclick="makeGuess()">確定</button>
+        </div>
+
+        <ul class="history-list" id="historyList"></ul>
+
+        <button class="btn btn-primary hidden" id="restartBtn" onclick="location.reload()">重新開始</button>
+    </div>
+</div>
+
+<script>
+    // 遊戲變數
+    let secretCode = "";
+    let maxAttempts = 10;
+    let currentAttempts = 0;
+    let isGameOver = false;
+
+    // 產生謎底 (不重複的3個數字)
+    function generateSecret() {
+        let nums = [0,1,2,3,4,5,6,7,8,9];
+        // 洗牌
+        for(let i = nums.length - 1; i > 0; i--){
+            const j = Math.floor(Math.random() * (i+1));
+            [nums[i], nums[j]] = [nums[j], nums[i]];
+        }
+        return nums.slice(0, 3).join("");
+    }
+
+    // 開始遊戲
+    function startGame() {
+        secretCode = generateSecret();
+        currentAttempts = 0;
+        isGameOver = false;
+        
+        // UI 切換
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('gameScreen').style.display = 'block';
+        document.getElementById('guessInput').focus();
+        
+        // 重置氣球
+        updateBalloon(0);
+        
+        console.log("作弊碼: " + secretCode); // 測試用
+    }
+
+    // 更新氣球大小
+    function updateBalloon(errors) {
+        const balloon = document.getElementById('balloon');
+        // 基礎大小 scale(1)，每錯一次增加 0.25 倍
+        // 當錯誤達到 9 次時 (剩1次機會)，氣球會非常大
+        let scale = 1 + (errors * 0.25);
+        balloon.style.transform = `scale(${scale})`;
+        balloon.textContent = "🎈";
+    }
+
+    // 氣球爆炸效果
+    function explodeBalloon() {
+        const balloon = document.getElementById('balloon');
+        balloon.classList.add('exploding');
+        
+        // 動畫結束後變換圖示
+        setTimeout(() => {
+            balloon.classList.remove('exploding');
+            balloon.style.transform = "scale(2)"; // 爆炸後圖示大小
+            balloon.textContent = "💥";
+        }, 300);
+    }
+
+    // 猜測邏輯
+    function makeGuess() {
+        if (isGameOver) return;
+
+        const input = document.getElementById('guessInput');
+        const guess = input.value;
+        const msg = document.getElementById('message');
+
+        // 驗證輸入
+        if (!/^\d{3}$/.test(guess)) {
+            msg.textContent = "請輸入 3 個數字！";
+            return;
+        }
+        if (new Set(guess).size !== 3) {
+            msg.textContent = "數字不能重複！";
+            return;
+        }
+
+        msg.textContent = "";
+        
+        // 計算 AB
+        let a = 0, b = 0;
+        for (let i = 0; i < 3; i++) {
+            if (guess[i] === secretCode[i]) a++;
+            else if (secretCode.includes(guess[i])) b++;
+        }
+
+        // 增加紀錄
+        addToHistory(guess, a, b);
+        input.value = "";
+        input.focus();
+
+        // 判斷結果
+        if (a === 3) {
+            // 贏了
+            gameWin();
+        } else {
+            // 輸一次
+            currentAttempts++;
+            let left = maxAttempts - currentAttempts;
+            document.getElementById('attemptsLeft').textContent = left;
+
+            if (left === 0) {
+                // 輸了 (爆炸)
+                gameLose();
+            } else {
+                // 氣球變大
+                updateBalloon(currentAttempts);
+                msg.textContent = `沒猜中！剩餘 ${left} 次機會`;
+            }
+        }
+    }
+
+    function addToHistory(guess, a, b) {
+        const list = document.getElementById('historyList');
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        
+        // 顏色標記
+        let color = '#7f8c8d'; // 灰色
+        if (a === 3) color = '#2ecc71'; // 綠色
+        else if (a > 0) color = '#e67e22'; // 橘色
+        else if (b > 0) color = '#f1c40f'; // 黃色
+
+        li.innerHTML = `
+            <span>${list.children.length + 1}. ${guess}</span>
+            <span style="color:${color}; font-weight:bold">${a}A${b}B</span>
+        `;
+        list.prepend(li);
+    }
+
+    function gameWin() {
+        isGameOver = true;
+        document.getElementById('message').textContent = "太強了！恭喜過關！🎉";
+        document.getElementById('message').style.color = "#2ecc71";
+        document.getElementById('gameStatus').textContent = "獲勝";
+        endGameUI();
+    }
+
+    function gameLose() {
+        isGameOver = true;
+        explodeBalloon(); // 觸發爆炸
+        document.getElementById('message').textContent = `BOOM! 遊戲結束。答案是: ${secretCode}`;
+        document.getElementById('gameStatus').textContent = "失敗";
+        endGameUI();
+    }
+
+    function endGameUI() {
+        document.getElementById('guessInput').disabled = true;
+        document.getElementById('guessBtn').classList.add('hidden');
+        document.getElementById('restartBtn').classList.remove('hidden');
+    }
+
+    // 綁定 Enter 鍵
+    document.getElementById('guessInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') makeGuess();
+    });
+
+</script>
+
+</body>
+</html>
